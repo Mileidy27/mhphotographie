@@ -342,17 +342,17 @@
     }
 
     function BookingForm() {
-  const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
 
   // ⚠️ Remplace par TON endpoint Formspree, ex. "https://formspree.io/f/abcd1234"
   const FORMSPREE_ENDPOINT = "https://formspree.io/f/xkgvwkqg";
 
   // Champ "honeypot" anti-bot (les humains ne le remplissent pas)
-  const [bot, setBot] = useState("");
+  const [bot, setBot] = React.useState("");
 
-  const [form, setForm] = useState({
+  const [form, setForm] = React.useState({
     nom: "",
     email: "",
     type: categories[0],
