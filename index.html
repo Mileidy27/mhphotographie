@@ -342,58 +342,160 @@
     }
 
     function BookingForm() {
-      const [sent, setSent] = React.useState(false);
-      const [loading, setLoading] = React.useState(false);
-      const [form, setForm] = React.useState({ nom: "", email: "", type: categories[0], message: "" });
-      const canSubmit = form.nom && /.+@.+\..+/.test(form.email);
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-      async function submit(e) {
-        e.preventDefault();
-        if (!canSubmit) return;
-        setLoading(true);
-        try {
-          const subject = encodeURIComponent('Demande de réservation — ' + form.type);
-          const body = encodeURIComponent('Nom: ' + form.nom + '\nEmail: ' + form.email + '\nType de séance: ' + form.type + '\n\nMessage:\n' + form.message);
-          window.location.href = 'mailto:contact@mileidyphoto.example?subject=' + subject + '&body=' + body;
-          setSent(true);
-        } finally {
-          setLoading(false);
-        }
+  // ⚠️ Remplace par TON endpoint Formspree, ex. "https://formspree.io/f/abcd1234"
+  const FORMSPREE_ENDPOINT = "https://formspree.io/f/xkgvwkqg";
+
+  // Champ "honeypot" anti-bot (les humains ne le remplissent pas)
+  const [bot, setBot] = useState("");
+
+  const [form, setForm] = useState({
+    nom: "",
+    email: "",
+    type: categories[0],
+    message: "",
+  });
+  const canSubmit = form.nom && /.+@.+\..+/.test(form.email);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!canSubmit || loading) return;
+
+    // Si le honeypot est rempli, on ignore (probable bot)
+    if (bot) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = {
+        nom: form.nom,
+        email: form.email,
+        type: form.type,
+        message: form.message,
+        _subject: `Demande de réservation — ${form.type}`,
+        _replyto: form.email,
+        source: "site-mileidy",
+      };
+
+      const res = await fetch(FORMSPREE_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setSent(true);
+        setForm({ nom: "", email: "", type: categories[0], message: "" });
+      } else {
+        const txt = await res.text().catch(() => "");
+        console.error("Formspree error:", txt);
+        setError("Impossible d'envoyer le message pour le moment. Réessaie plus tard ou écris-moi directement.");
       }
-
-      return (
-        <section id="reserver" className="py-20 bg-cream">
-          <div className="mx-auto max-w-3xl px-6">
-            <h2 className="text-center text-3xl md:text-4xl font-serif italic text-coffee">Réserver une séance photo</h2>
-            <form onSubmit={submit} className="mt-10 grid grid-cols-1 gap-6">
-              <div>
-                <label htmlFor="nom" className="block text-sm font-medium text-neutral-700">Nom</label>
-                <input id="nom" type="text" value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 focus:outline-none focus:ring-2" />
-              </div>
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-neutral-700">Courriel</label>
-                <input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 focus:outline-none focus:ring-2" />
-              </div>
-              <div>
-                <label htmlFor="type" className="block text-sm font-medium text-neutral-700">Type de séance</label>
-                <select id="type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 focus:outline-none focus:ring-2">
-                  {categories.map((k) => (<option key={k} value={k}>{k}</option>))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium text-neutral-700">Message</label>
-                <textarea id="message" rows={5} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 focus:outline-none focus:ring-2" />
-              </div>
-              <button disabled={!canSubmit || loading} className={"rounded-full px-6 py-3 text-white font-medium transition " + (canSubmit ? "" : "opacity-60 cursor-not-allowed") + " bg-taupe"}>
-                {loading ? "Envoi…" : "Envoyer"}
-              </button>
-              {sent && (<p className="text-sm text-green-700">Merci! Votre outil courriel s'ouvrira pour compléter l'envoi. Vous recevrez une réponse sous peu.</p>)}
-              <p className="text-xs text-neutral-500">* En envoyant ce formulaire, vous acceptez d'être contacté·e par courriel. Vos informations ne sont jamais partagées.</p>
-            </form>
-          </div>
-        </section>
-      );
+    } catch (err) {
+      console.error(err);
+      setError("Un incident réseau est survenu. Vérifie ta connexion et réessaie.");
+    } finally {
+      setLoading(false);
     }
+  }
+
+  return (
+    <section id="reserver" className="py-20" style={{ background: palette.cream }}>
+      <div className="mx-auto max-w-3xl px-6">
+        <h2 className="text-center text-3xl md:text-4xl font-serif italic" style={{ color: palette.coffee }}>
+          Réserver une séance photo
+        </h2>
+
+        <form onSubmit={submit} className="mt-10 grid grid-cols-1 gap-6">
+          {/* Honeypot anti-bot (caché aux humains) */}
+          <input
+            type="text"
+            name="website"
+            value={bot}
+            onChange={(e) => setBot(e.target.value)}
+            className="hidden"
+            tabIndex={-1}
+            autoComplete="off"
+          />
+
+          <div>
+            <label htmlFor="nom" className="block text-sm font-medium text-neutral-700">Nom</label>
+            <input
+              id="nom"
+              name="nom"
+              type="text"
+              required
+              value={form.nom}
+              onChange={(e) => setForm({ ...form, nom: e.target.value })}
+              className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 focus:outline-none focus:ring-2"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-neutral-700">Courriel</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 focus:outline-none focus:ring-2"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="type" className="block text-sm font-medium text-neutral-700">Type de séance</label>
+            <select
+              id="type"
+              name="type"
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+              className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 focus:outline-none focus:ring-2"
+            >
+              {categories.map((k) => (<option key={k} value={k}>{k}</option>))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="message" className="block text-sm font-medium text-neutral-700">Message</label>
+            <textarea
+              id="message"
+              name="message"
+              rows={5}
+              required
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+              className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 focus:outline-none focus:ring-2"
+            />
+          </div>
+
+          <button
+            disabled={!canSubmit || loading}
+            className={`rounded-full px-6 py-3 text-white font-medium transition ${canSubmit ? "" : "opacity-60 cursor-not-allowed"}`}
+            style={{ background: palette.taupe }}
+          >
+            {loading ? "Envoi…" : "Envoyer"}
+          </button>
+
+          {sent && (<p className="text-sm text-green-700">Merci! Ton message a bien été envoyé — je te réponds sous peu.</p>)}
+          {error && (<p className="text-sm text-red-700">{error}</p>)}
+
+          <p className="text-xs text-neutral-500">
+            * En envoyant ce formulaire, vous acceptez d'être contacté·e par courriel. Vos informations ne sont jamais partagées.
+          </p>
+        </form>
+      </div>
+    </section>
+  );
+}
+
 
     function Footer() {
       return (
